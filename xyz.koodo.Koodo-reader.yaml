@@ -1,0 +1,52 @@
+app-id: xyz.koodo.Koodo-reader
+runtime: org.freedesktop.Platform
+runtime-version: '20.08'
+base: org.electronjs.Electron2.BaseApp
+base-version: '20.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.node14
+command: start-koodo-reader
+finish-args:
+  - --share=ipc
+  - --socket=x11
+  - --socket=pulseaudio
+  - --share=network
+  - --filesystem=home
+modules:
+  # we need python2 for node-gpg
+  - shared-modules/python2.7/python-2.7.json
+  - name: yarn
+    buildsystem: simple
+    build-commands:
+      - 'cp -a * /app'
+    # Only used for building, so clean it up afterwards.
+    cleanup:
+      - '*'
+    sources:
+      - type: archive
+        url: https://github.com/yarnpkg/yarn/releases/download/v1.22.10/yarn-v1.22.10.tar.gz
+        sha256: 7e433d4a77e2c79e6a7ae4866782608a8e8bcad3ec6783580577c59538381a6e
+  - name: koodo-reader
+    buildsystem: simple
+    build-options:
+      append-path: /usr/lib/sdk/node14/bin:/app/bin
+      env:
+        # Sets the directory where Node is located so way npm won't download the headers.
+        npm_config_nodedir: /usr/lib/sdk/node14
+        # Set the Electron cache directory.
+        ELECTRON_CACHE: /run/build/github-desktop/flatpak-node/electron-cache
+        # Skip Electron related downloads
+        ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    build-commands:
+      - HOME=$PWD yarn config --offline set yarn-offline-mirror ./flatpak-node/yarn-mirror
+      - HOME=$PWD yarn config --offline set python $(which python) 
+      - yarn --offline --verbose
+      - yarn --offline build
+      - ./flatpak-node/electron-builder-arch-args.sh yarn --offline release -- $ELECTRON_BUILDER_ARCH_ARGS  --linux --dir
+    sources:
+      - type: git
+        url: https://github.com/troyeguo/koodo-reader.git
+        tag: v1.3.0
+        commit: 5f4f553f2e67e29ca2f903abf7caed4d3d2f2cd9
+      - generated-sources.json
